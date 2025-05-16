@@ -12,20 +12,38 @@ Search results:
 {search_results_details_json}
 
 Evaluate if clarification is needed based on:
+
 1. Query Clarity:
    - Is the query ambiguous or missing important details?
    - Are there multiple possible interpretations?
    - Does the context from chat history help clarify the intent?
+   - Can previous messages help resolve ambiguities?
 
 2. Search Results Quality:
-   - Do the results match the user's intent?
-   - Are there too many or too few results?
-   - Are the results relevant to the query?
+   - Are there any results found?
+   - If no results, is it due to:
+     * Query being too specific?
+     * Possible misspellings?
+     * Missing context?
+     * Invalid filters or criteria?
+   - If results exist:
+     * Do they match the user's intent?
+     * Are there too many or too few results?
+     * Are the results relevant to the query?
 
 3. Context Completeness:
-   - Is there enough information to provide a meaningful response?
+   - Is there enough information from both query and chat history?
    - Would additional details help narrow down the results?
    - Does the conversation history provide sufficient context?
+   - Are there any referenced items from previous messages?
+
+4. Empty Results Handling:
+   When no results are found, consider:
+   - Previous successful searches in chat history
+   - User's expressed preferences
+   - Similar categories or types mentioned before
+   - Price ranges discussed earlier
+   - Alternative search terms based on context
 
 Return a JSON object with:
 - "clarification_needed": boolean (true if clarification is needed)
@@ -33,10 +51,22 @@ Return a JSON object with:
 
 Example responses:
 
-For unclear query with no results:
+For empty results with context:
 {{
   "clarification_needed": true,
-  "clarification_question": "Could you specify what type of cheese you're looking for? For example, are you interested in soft, hard, or aged cheeses?"
+  "clarification_question": "I notice you were interested in aged cheddars earlier, but I couldn't find any matching your current criteria. Would you like to see other aged cheddars or shall we look for different types of aged cheeses?"
+}}
+
+For empty results without context:
+{{
+  "clarification_needed": true,
+  "clarification_question": "I couldn't find any cheeses matching your search. Could you tell me more about what type of cheese you're looking for? For example, are you interested in soft, hard, or aged varieties?"
+}}
+
+For empty results with possible misspelling:
+{{
+  "clarification_needed": true,
+  "clarification_question": "I couldn't find any matches for 'camambert'. Did you mean 'camembert'? Or would you like to see other soft cheeses similar to camembert?"
 }}
 
 For clear query with good results:
@@ -48,7 +78,20 @@ For clear query with good results:
 For ambiguous query with too many results:
 {{
   "clarification_needed": true,
-  "clarification_question": "I found several options. Could you tell me if you have any preferences regarding price range or flavor intensity?"
+  "clarification_question": "I found several options. Based on your previous interest in artisanal cheeses, would you like me to focus on artisanal varieties, or would you prefer to specify a different criteria like price range or flavor intensity?"
 }}
 
-Make your decision based on the current query, search results, and conversation context.
+Make your decision based on:
+1. The current query content
+2. The search results (or lack thereof)
+3. The conversation history
+4. Previous preferences or interests
+5. Previous successful searches
+6. Any clarifications already provided
+
+Remember:
+- Use chat history to avoid asking for information the user has already provided
+- Reference previous successful searches when suggesting alternatives
+- Consider previous preferences when formulating clarification questions
+- Make suggestions based on the user's demonstrated interests
+- If results are empty, try to understand why before asking for clarification

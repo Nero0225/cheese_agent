@@ -184,13 +184,10 @@ def keyword_search_mongo(collection, user_query: str, llm_instance: any, chat_hi
         formatted_messages = []
         for msg in recent_messages:
             if isinstance(msg, tuple):
-                role, content = msg
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
             else:
                 # Handle dictionary format if present
-                role = msg.get('role', 'unknown')
-                content = msg.get('content', '')
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
         chat_history_summary = "\n".join(formatted_messages)
     else:
         chat_history_summary = "No previous conversation history."

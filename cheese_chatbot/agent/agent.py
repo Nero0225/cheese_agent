@@ -95,14 +95,12 @@ def classify_query_node(state: AgentState, resources: Dict[str, Any]) -> AgentSt
         recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
         formatted_messages = []
         for msg in recent_messages:
+            print("Debuging agent.py line 175: ", msg, msg.type, msg.content)
             if isinstance(msg, tuple):
-                role, content = msg
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
             else:
                 # Handle dictionary format if present
-                role = msg.get('role', 'unknown')
-                content = msg.get('content', '')
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
         chat_history_summary = "\n".join(formatted_messages)
     else:
         chat_history_summary = "No previous conversation history."
@@ -175,13 +173,10 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
         formatted_messages = []
         for msg in recent_messages:
             if isinstance(msg, tuple):
-                role, content = msg
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
             else:
                 # Handle dictionary format if present
-                role = msg.get('role', 'unknown')
-                content = msg.get('content', '')
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
         chat_history_summary = "\n".join(formatted_messages)
     else:
         chat_history_summary = "No previous conversation history."
@@ -294,13 +289,10 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
         formatted_messages = []
         for msg in recent_messages:
             if isinstance(msg, tuple):
-                role, content = msg
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
             else:
                 # Handle dictionary format if present
-                role = msg.get('role', 'unknown')
-                content = msg.get('content', '')
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
         chat_history_summary = "\n".join(formatted_messages)
     else:
         chat_history_summary = "No previous conversation history."
@@ -468,13 +460,10 @@ def generate_composite_response_node(state: AgentState, resources: Dict[str, Any
         formatted_messages = []
         for msg in recent_messages:
             if isinstance(msg, tuple):
-                role, content = msg
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
             else:
                 # Handle dictionary format if present
-                role = msg.get('role', 'unknown')
-                content = msg.get('content', '')
-                formatted_messages.append(f"{role}: {content}")
+                formatted_messages.append(f"{msg.type}: {msg.content}")
         chat_history_summary = "\n".join(formatted_messages)
     else:
         chat_history_summary = "No previous conversation history."
@@ -512,7 +501,7 @@ def generate_composite_response_node(state: AgentState, resources: Dict[str, Any
         
         # Update chat history with the new interaction
         updated_chat_history = list(chat_history)
-        if not updated_chat_history or updated_chat_history[-1][1] != input_query:
+        if not updated_chat_history or updated_chat_history[-1].content != input_query:
             updated_chat_history.append(("user", input_query))
         updated_chat_history.append(("assistant", final_response))
 
