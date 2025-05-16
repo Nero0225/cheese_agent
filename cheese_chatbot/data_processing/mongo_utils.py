@@ -149,21 +149,21 @@ def ensure_text_indexes(collection):
     else:
         print(f"Text index '{index_name}' (or equivalent) already exists.")
 
-def keyword_search_mongo(collection, user_query: str, llm_instance: any, limit: int = 10) -> list:
+def keyword_search_mongo(collection, user_query: str, llm_instance: any, chat_history: list = None, limit: int = 10) -> list:
     """
-    Performs a search in MongoDB using an LLM-generated query (filter or aggregation).
-    Tries to infer if an aggregation query is needed, otherwise generates a filter query.
+    Performs a search in MongoDB using an LLM-generated query.
+    Uses chat history context to generate more accurate queries.
 
     Args:
         collection: The MongoDB collection object.
         user_query (str): The natural language user query.
         llm_instance (any): An initialized LLM instance capable of .invoke().
-        limit (int): The maximum number of documents to return for filter queries.
+        chat_history (list): Optional list of previous conversation messages.
+        limit (int): The maximum number of documents to return.
 
     Returns:
         list: A list of documents from MongoDB, or an empty list if an error occurs
-              or no results are found. For aggregation queries that return a single
-              summary document (e.g. count), the list will contain that single document.
+              or no results are found.
     """
     if collection is None:
         raise ValueError("MongoDB collection is not initialized.")
@@ -175,88 +175,75 @@ def keyword_search_mongo(collection, user_query: str, llm_instance: any, limit: 
 
     print(f"Original user query for MongoDB: '{user_query}'")
     results = []
-    query_type_from_llm = "FILTER" # Default in case of issues
+
+    # Format chat history for the prompt
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                role, content = msg
+                formatted_messages.append(f"{role}: {content}")
+            else:
+                # Handle dictionary format if present
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                formatted_messages.append(f"{role}: {content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
 
     try:
         prompt_template = load_prompt_from_file("mongo_unified_query_generation_prompt.txt")
-        llm_prompt = prompt_template.format(query=user_query)
+        llm_prompt = prompt_template.format(
+            input_query=user_query,
+            chat_history_summary=chat_history_summary
+        )
         
         response = llm_instance.invoke([HumanMessage(content=llm_prompt)])
-        # print(response.content)
-        generated_json_str = response.content.strip("```json").strip()
+        generated_json_str = response.content.strip()
+        
+        # Clean up JSON string if it's wrapped in markdown code blocks
+        if generated_json_str.startswith("```json"):
+            generated_json_str = generated_json_str[7:]
+        if generated_json_str.endswith("```"):
+            generated_json_str = generated_json_str[:-3]
+        generated_json_str = generated_json_str.strip()
+        
         print(f"LLM generated JSON response: {generated_json_str}")
-        # Remove markdown ```json ... ``` if present
-        # if generated_json_str.startswith("```json"):
-        #     generated_json_str = generated_json_str[7:-3].strip()
-        # elif generated_json_str.startswith("```"):
-        #     generated_json_str = generated_json_str[3:-3].strip()
-            
-        # print(f"LLM generated JSON response: {generated_json_str}")
 
-        llm_response_data = json.loads(generated_json_str)
-        query_type_from_llm = llm_response_data.get("query_type", "FILTER").upper()
-        query_body = llm_response_data.get("query_body")
+        query_data = json.loads(generated_json_str)
+        
+        # Extract query components
+        mongo_query = query_data.get("query", {})
+        sort_criteria = query_data.get("sort")
+        result_limit = query_data.get("limit", limit)
+        explanation = query_data.get("explanation", "No explanation provided")
+        
+        print(f"Generated MongoDB query: {mongo_query}")
+        print(f"Query explanation: {explanation}")
 
-        if not query_body:
-            raise ValueError("LLM response missing 'query_body'.")
+        # Execute the query
+        cursor = collection.find(mongo_query)
+        
+        # Apply sorting if specified
+        if sort_criteria:
+            cursor = cursor.sort(list(sort_criteria.items()))
+        
+        # Apply limit
+        cursor = cursor.limit(result_limit)
+        
+        # Convert cursor to list
+        results = list(cursor)
+        print(f"Found {len(results)} results for the query.")
 
-        print(f"LLM classified query as: {query_type_from_llm}, Query body: {query_body}")
-
-        if query_type_from_llm == "AGGREGATION":
-            if not isinstance(query_body, list):
-                raise ValueError("Aggregation query_body must be a list.")
-            if not query_body: # Empty pipeline by choice from LLM
-                print("LLM returned an empty aggregation pipeline. No results.")
-                results = []
-            else:
-                results = list(collection.aggregate(query_body))
-                print(f"MongoDB aggregation query executed. Found {len(results)} results.")
-        elif query_type_from_llm == "FILTER":
-            if not isinstance(query_body, dict):
-                raise ValueError("Filter query_body must be a dictionary.")
-            projection = {'_id': 1, 'name': 1, 'sku': 1, 'brand': 1, 'category': 1, 'description': 1, 'prices': 1, 'images':1, 'href': 1, 'pricePer': 1, 'warning_text': 1, 'characteristics':1}
-            results = list(collection.find(query_body, projection))
-            print(f"MongoDB filter query executed. Found {len(results)} results.")
-        else:
-            print(f"Unknown query_type from LLM: '{query_type_from_llm}'. Defaulting to no results from LLM stage.")
-            results = [] # Treat unknown type as no result from this stage
-
-    except FileNotFoundError:
-        print("Unified query generation prompt file not found. Cannot proceed with LLM query generation.")
-        # No results from LLM stage, will go to fallback if `results` remains empty.
     except json.JSONDecodeError as e:
-        print(f"Error decoding JSON from LLM for unified query: {e}")
-        print(f"LLM output was: {generated_json_str}")
-        # No results from LLM stage
-    except ValueError as e:
-        print(f"Error in LLM response structure or query body: {e}")
-        # No results from LLM stage
-    except OperationFailure as e:
-        print(f"MongoDB operation failed for LLM-generated query: {e}")
-        # No results from LLM stage
+        print(f"Error parsing LLM response as JSON: {e}")
+        return []
     except Exception as e:
-        print(f"An unexpected error occurred during LLM query generation/execution: {e}")
-        # No results from LLM stage
-    
-    if not results:
-        print(f"LLM-generated query ('{query_type_from_llm}' type attempt) failed or returned no results. Falling back to basic text search for: '{user_query}'")
-        try:
-            ensure_text_indexes(collection) # Ensure text index exists
-            results = list(collection.find(
-                {'$text': {'$search': user_query}},
-                {'score': {'$meta': 'textScore'}, '_id': 1, 'name': 1, 'sku': 1, 'brand': 1, 'category': 1, 'description': 1, 'prices': 1, 'images':1, 'href': 1}
-            ).sort([('score', {'$meta': 'textScore'})])) #.limit(limit))
-            print(f"Fallback MongoDB text search found {len(results)} results for query '{user_query}'.")
-        except OperationFailure as e:
-            print(f"Fallback MongoDB text search failed: {e}")
-            return []
-        except Exception as e:
-            print(f"An unexpected error occurred during fallback MongoDB text search: {e}")
-            return []
+        print(f"Error during MongoDB search: {e}")
+        return []
 
-    # Convert ObjectId to string for JSON serialization if needed later
-    for item in results:
-        if '_id' in item and not isinstance(item['_id'], str): # Check if not already string (e.g. from aggregation)
-            item['_id'] = str(item['_id'])
-    
     return results

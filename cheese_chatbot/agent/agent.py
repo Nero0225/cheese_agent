@@ -85,20 +85,38 @@ def classify_query_node(state: AgentState, resources: Dict[str, Any]) -> AgentSt
     """Classifies the user's query intent."""
     print(f"--- Classifying Query: {state['input_query']} ---")
     classification_llm = resources["llm"]
-    # Chat history summary is no longer used by the prompt template for this node
-    # chat_history_summary = "\n".join([f"{msg.type}: {msg.content}" for msg in state.get('chat_history', [])[-5:]])
+    
+    # Format chat history for the prompt
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
+    
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                role, content = msg
+                formatted_messages.append(f"{role}: {content}")
+            else:
+                # Handle dictionary format if present
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                formatted_messages.append(f"{role}: {content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
 
     prompt_template = load_prompt_from_file("classify_query_prompt.txt")
-    # formatted_prompt = prompt_template.format(
-    #     chat_history_summary=chat_history_summary, # Removed
-    #     input_query=state["input_query"]
-    # )
-    formatted_prompt = prompt_template.format(input_query=state["input_query"])
+    formatted_prompt = prompt_template.format(
+        input_query=state["input_query"],
+        chat_history_summary=chat_history_summary
+    )
     
     messages = [HumanMessage(content=formatted_prompt)]
     
     reasoning_steps = state.get("reasoning_steps", [])
-    reasoning_steps.append(f"Classifying query: '{state['input_query']}'. Prompt: {formatted_prompt[:200]}...") # Log snippet
+    reasoning_steps.append(f"Classifying query: '{state['input_query']}' with chat history context. Prompt: {formatted_prompt[:200]}...") 
     
     try:
         response = classification_llm.invoke(messages)
@@ -142,14 +160,39 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
     mongo_collection = resources["mongo_collection"]
     pinecone_index = resources["pinecone_index"]
     embedding_model = resources["embedding_model"]
-    llm_for_mongo_keywords = resources["llm"] # Main LLM for keyword generation for Mongo
+    llm_for_mongo_keywords = resources["llm"]
 
     reasoning_steps = state.get("reasoning_steps", [])
     search_results: List[Dict[str, Any]] = []
-    strategy_prompt_template = load_prompt_from_file("decide_search_strategy_prompt.txt")
-    formatted_strategy_prompt = strategy_prompt_template.format(input_query=query)
+
+    # Format chat history for the prompt
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
     
-    reasoning_steps.append(f"Asking LLM to decide search strategy for query: '{query}'. Prompt: {formatted_strategy_prompt[:200]}...")
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                role, content = msg
+                formatted_messages.append(f"{role}: {content}")
+            else:
+                # Handle dictionary format if present
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                formatted_messages.append(f"{role}: {content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
+
+    strategy_prompt_template = load_prompt_from_file("decide_search_strategy_prompt.txt")
+    formatted_strategy_prompt = strategy_prompt_template.format(
+        input_query=query,
+        chat_history_summary=chat_history_summary
+    )
+    
+    reasoning_steps.append(f"Deciding search strategy for query: '{query}' with chat history context. Prompt: {formatted_strategy_prompt[:200]}...")
 
     search_strategy = "pinecone" # Default strategy
     try:
@@ -163,7 +206,7 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
         chosen_strategy = strategy_json.get("search_strategy")
         if chosen_strategy in ["mongodb", "pinecone"]:
             search_strategy = chosen_strategy
-            reasoning_steps.append(f"LLM chose search strategy: {search_strategy}")
+            reasoning_steps.append(f"LLM chose search strategy: {search_strategy} based on query and conversation context")
         else:
             reasoning_steps.append(f"LLM returned invalid strategy '{chosen_strategy}'. Defaulting to {search_strategy}.")
     except Exception as e:
@@ -175,9 +218,14 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
 
     if search_strategy == "mongodb":
         try:
-            # keyword_search_mongo is expected to return a list of dicts
-            # It uses an LLM (llm_for_mongo_keywords) to generate the actual mongo query.
-            mongo_matches = keyword_search_mongo(mongo_collection, query, llm_for_mongo_keywords, limit=10)
+            # Pass chat history to keyword_search_mongo
+            mongo_matches = keyword_search_mongo(
+                mongo_collection, 
+                query, 
+                llm_for_mongo_keywords,
+                chat_history=chat_history,
+                limit=10
+            )
             reasoning_steps.append(f"MongoDB keyword search returned {len(mongo_matches)} matches.")
             for item in mongo_matches:
                 if '_id' in item:
@@ -236,25 +284,40 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
     reasoning_steps = state.get("reasoning_steps", [])
     reasoning_steps.append(f"Evaluating {len(search_results)} search results for query: '{input_query}'. Strategy used: {executed_search_strategy}.")
 
-    # Prepare the top N results as a JSON string for the prompt
-    # Limiting to top 5 for brevity in the prompt, but can be adjusted.
-    # top_results_for_prompt = search_results[:5]
-    search_results_details_json = json.dumps(search_results, indent=2) # Convert to JSON string
+    # Format chat history for the prompt
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
     
-    # The user previously added a print statement here for results_summary, 
-    # we can update it or remove it. For now, let's print the new JSON details.
-    # print(f"Debuging agent.py line 230: Search results details (JSON for prompt): {search_results_details_json}")
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                role, content = msg
+                formatted_messages.append(f"{role}: {content}")
+            else:
+                # Handle dictionary format if present
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                formatted_messages.append(f"{role}: {content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
 
+    # Prepare the search results as a JSON string for the prompt
+    search_results_details_json = json.dumps(search_results, indent=2)
+    
     prompt_template = load_prompt_from_file("evaluate_search_clarification_prompt.txt")
 
     formatted_prompt = prompt_template.format(
         input_query=input_query,
-        search_results_details_json=search_results_details_json, # Use new placeholder and pass JSON string
-        executed_search_strategy=executed_search_strategy
+        search_results_details_json=search_results_details_json,
+        executed_search_strategy=executed_search_strategy,
+        chat_history_summary=chat_history_summary
     )
     
     messages = [HumanMessage(content=formatted_prompt)]
-    # Increased length for prompt logging due to JSON details
     reasoning_steps.append(f"Asking LLM if clarification is needed. Strategy: {executed_search_strategy}. Prompt (first 500 chars): {formatted_prompt[:500]}...")
 
     try:
@@ -268,7 +331,7 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
         response_content = response_content.strip()
         print("Debuging agent.py line 266: Response content: ", response_content)
 
-        evaluation = json.loads(response_content) # Expects {"clarification_needed": bool, "clarification_question": str}
+        evaluation = json.loads(response_content)
         
         human_feedback_needed = evaluation.get("clarification_needed", False)
         clarification_prompt = evaluation.get("clarification_question", "")
@@ -276,9 +339,9 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
         print("Debuging agent.py line 273: Human feedback needed: ", evaluation)
 
         if human_feedback_needed:
-            reasoning_steps.append(f"LLM suggests clarification is needed. Question: '{clarification_prompt}'")
+            reasoning_steps.append(f"LLM suggests clarification is needed based on query and conversation context. Question: '{clarification_prompt}'")
         else:
-            reasoning_steps.append("LLM suggests query is clear enough or clarification not beneficial. Proceeding to generate response.")
+            reasoning_steps.append("LLM suggests query and context are clear enough. Proceeding to generate response.")
         
         print("Debuging agent.py line 278: Human feedback needed: ", human_feedback_needed)
         print("Debuging agent.py line 279: Clarification question: ", clarification_prompt)
@@ -293,11 +356,11 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
     except json.JSONDecodeError as e:
         print(f"Error decoding JSON from evaluation LLM: {e}. Content: {response.content}")
         reasoning_steps.append(f"JSONDecodeError during evaluation: {e}. Proceeding without clarification.")
-        return {**state, "human_feedback_needed": False, "current_node": "evaluate_search_node", "reasoning_steps": reasoning_steps} # Fallback
+        return {**state, "human_feedback_needed": False, "current_node": "evaluate_search_node", "reasoning_steps": reasoning_steps}
     except Exception as e:
         print(f"Error in evaluate_search_node LLM call: {e}")
         reasoning_steps.append(f"Error in evaluate_search_node LLM call: {e}. Proceeding without clarification.")
-        return {**state, "human_feedback_needed": False, "current_node": "evaluate_search_node", "reasoning_steps": reasoning_steps} # Fallback
+        return {**state, "human_feedback_needed": False, "current_node": "evaluate_search_node", "reasoning_steps": reasoning_steps}
 
 def request_human_input_node(state: AgentState, resources: Dict[str, Any]) -> AgentState:
     """Node that signifies the agent needs to wait for human input.
@@ -370,7 +433,7 @@ def process_human_input_node(state: AgentState, resources: Dict[str, Any]) -> Ag
     # Store the original query that led to this, in case it's needed for context later (though chat history also has it)
     return {
         **state,
-        "input_query": input_query + " " + human_response, 
+        "input_query": input_query + ", " + human_response, 
         "original_query_for_clarification": original_query_for_clarification, # Persist original query if needed
         "chat_history": chat_history,
         "search_results": [],
@@ -397,70 +460,80 @@ def generate_composite_response_node(state: AgentState, resources: Dict[str, Any
     reasoning_steps = state.get("reasoning_steps", [])
     reasoning_steps.append(f"Generating composite response for query: '{input_query}'. Strategy used: {executed_search_strategy}")
 
-    # chat_history_for_prompt_summary is no longer used by this node's prompt.
-    # chat_history_for_prompt_summary = "\n".join([
-    #     f"{msg['role'] if isinstance(msg, dict) else (msg[0] if isinstance(msg, tuple) else msg.type)}: {msg['content'] if isinstance(msg, dict) else (msg[1] if isinstance(msg, tuple) else msg.content)}"
-    #     for msg in chat_history[-5:] # Last 5 messages for summary
-    # ])
-    # if not chat_history_for_prompt_summary:
-    #     chat_history_for_prompt_summary = "No recent chat history."
+    # Format chat history for the prompt
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                role, content = msg
+                formatted_messages.append(f"{role}: {content}")
+            else:
+                # Handle dictionary format if present
+                role = msg.get('role', 'unknown')
+                content = msg.get('content', '')
+                formatted_messages.append(f"{role}: {content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
 
-    # Step 1: Prepare search_results_summary_for_llm by serializing all search results to JSON
-    search_results_summary_for_llm = "No relevant cheeses found in the search."
-
+    # Prepare search results summary
+    search_results_summary = "No relevant cheeses found in the search."
     if search_results:
         try:
-            search_results_summary_for_llm = json.dumps(search_results) 
-            reasoning_steps.append(f"Serialized all {len(search_results)} search results to JSON for the main prompt.")
+            search_results_summary = json.dumps(search_results, indent=2)
+            reasoning_steps.append(f"Prepared search results summary with {len(search_results)} items.")
         except TypeError as e:
-            reasoning_steps.append(f"TypeError during JSON serialization of search results: {e}. Falling back to basic list.")
-            # Fallback if complex objects are not serializable by default json.dumps, though this should be rare with dicts
-            search_results_summary_for_llm = str(search_results) 
-    else:
-        reasoning_steps.append("No search results to summarize for the main prompt.")
+            reasoning_steps.append(f"Error formatting search results: {e}. Using basic string representation.")
+            search_results_summary = str(search_results)
 
-    count = len(search_results)
-    # Step 2: Call the main LLM to generate the composite response
-    system_prompt_template_name = "generate_composite_response_prompt.txt"
-    prompt_template = load_prompt_from_file(system_prompt_template_name)
+    # Generate the response using the composite prompt
+    system_prompt_template = load_prompt_from_file("generate_composite_response_prompt.txt")
     
-    formatted_system_prompt = prompt_template.format(
+    formatted_system_prompt = system_prompt_template.format(
         input_query=input_query,
-        # chat_history_summary=chat_history_for_prompt_summary, # Removed
-        search_results_summary=search_results_summary_for_llm,
-        executed_search_strategy=executed_search_strategy,
-        count=count if count > 0 else "undefined", # Ensure count is properly handled if 0, prompt expects a string or number not literally "undefined"
-        # result_type_classification is removed
+        chat_history_summary=chat_history_summary,
+        search_results_summary=search_results_summary,
+        executed_search_strategy=executed_search_strategy
     )
     
-    reasoning_steps.append(f"Using composite response prompt. Summary/Data: {search_results_summary_for_llm[:200]}...")
+    reasoning_steps.append(f"Using composite response prompt with chat history context. Results summary length: {len(search_results_summary)}")
 
-    user_message_content = input_query 
-
-    messages = [
-        HumanMessage(content=formatted_system_prompt) 
-    ]
-    reasoning_steps.append(f"System Prompt Snippet ({system_prompt_template_name}): {formatted_system_prompt[:300]}...")
-    reasoning_steps.append(f"User Message to LLM: {user_message_content[:200]}...")
+    messages = [HumanMessage(content=formatted_system_prompt)]
+    reasoning_steps.append(f"System Prompt Snippet: {formatted_system_prompt[:300]}...")
 
     try:
         response = llm.invoke(messages)
         final_response = response.content
         print(f"LLM Composite Response: {final_response}")
-        reasoning_steps.append(f"LLM generated composite response: {final_response[:100]}...")
+        reasoning_steps.append(f"LLM generated contextual response: {final_response[:100]}...")
         
+        # Update chat history with the new interaction
         updated_chat_history = list(chat_history)
-        if not updated_chat_history or updated_chat_history[-1].content != input_query or updated_chat_history[-1].type != "user":
-            if input_query and input_query.strip():
-                 updated_chat_history.append(("user", input_query))
+        if not updated_chat_history or updated_chat_history[-1][1] != input_query:
+            updated_chat_history.append(("user", input_query))
         updated_chat_history.append(("assistant", final_response))
 
-        return {**state, "llm_response": final_response, "chat_history": updated_chat_history, "current_node": "generate_composite_response_node", "reasoning_steps": reasoning_steps}
+        return {
+            **state, 
+            "llm_response": final_response, 
+            "chat_history": updated_chat_history,
+            "current_node": "generate_composite_response_node", 
+            "reasoning_steps": reasoning_steps
+        }
     except Exception as e:
         print(f"Error in generate_composite_response_node: {e}")
-        reasoning_steps.append(f"Error during composite response generation: {e}")
+        reasoning_steps.append(f"Error during response generation: {e}")
         fallback_response = "I encountered an issue while generating a response. Please try again."
-        return {**state, "llm_response": fallback_response, "chat_history": chat_history, "current_node": "generate_composite_response_node", "reasoning_steps": reasoning_steps}
+        return {
+            **state, 
+            "llm_response": fallback_response, 
+            "chat_history": chat_history,
+            "current_node": "generate_composite_response_node", 
+            "reasoning_steps": reasoning_steps
+        }
 
 # --- New Node for Greeting ---
 def generate_greeting_response_node(state: AgentState, resources: Dict[str, Any]) -> AgentState:

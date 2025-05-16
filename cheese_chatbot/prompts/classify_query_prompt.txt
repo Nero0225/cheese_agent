@@ -5,6 +5,9 @@ A "greeting_query" is when the user sends a greeting like "Hello", "Hi", "Good m
 A "cheese_query" is for all questions seeking details or assistance related to cheese. This includes requests for the number of cheeses (e.g., "how many blue cheeses?"), specific cheese details (e.g., "tell me about brie"), recommendations, comparisons, or a combination of these (e.g., "how many cheddars do you have and which is the sharpest?", "plz show me all products that are expensive than $50.", "plz show all products that are cheaper than $10).
 An "unrelated_query" is for any query that is not a greeting and is not related to cheese (e.g., "Do you know google?", "what is the weather today?", "tell me a joke about dogs", "who is the president?").
 
+Recent chat history (for context):
+{chat_history_summary}
+
 Based on the latest user query below, classify its intent.
 
 Latest user query:
@@ -12,8 +15,8 @@ Latest user query:
 
 Return a JSON object with a single key "intent" and the value as "greeting_query", "cheese_query", or "unrelated_query".
 Example for greeting:
-{{\"intent\": \"greeting_query\"}}
+{{"intent": "greeting_query"}}
 Example for a cheese-related information query:
-{{\"intent\": \"cheese_query\"}}
+{{"intent": "cheese_query"}}
 Example for an unrelated query:
-{{\"intent\": \"unrelated_query\"}} 
+{{"intent": "unrelated_query"}} 
