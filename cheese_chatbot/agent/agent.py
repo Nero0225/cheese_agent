@@ -88,12 +88,28 @@ def classify_query_node(state: AgentState, resources: Dict[str, Any]) -> AgentSt
     # Chat history summary is no longer used by the prompt template for this node
     # chat_history_summary = "\n".join([f"{msg.type}: {msg.content}" for msg in state.get('chat_history', [])[-5:]])
 
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+            else:
+                # Handle dictionary format if present
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
+
     prompt_template = load_prompt_from_file("classify_query_prompt.txt")
     # formatted_prompt = prompt_template.format(
     #     chat_history_summary=chat_history_summary, # Removed
     #     input_query=state["input_query"]
     # )
-    formatted_prompt = prompt_template.format(input_query=state["input_query"])
+    formatted_prompt = prompt_template.format(input_query=state["input_query"], chat_history_summary=chat_history_summary)
     
     messages = [HumanMessage(content=formatted_prompt)]
     
@@ -144,10 +160,26 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
     embedding_model = resources["embedding_model"]
     llm_for_mongo_keywords = resources["llm"] # Main LLM for keyword generation for Mongo
 
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+            else:
+                # Handle dictionary format if present
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
+
     reasoning_steps = state.get("reasoning_steps", [])
     search_results: List[Dict[str, Any]] = []
     strategy_prompt_template = load_prompt_from_file("decide_search_strategy_prompt.txt")
-    formatted_strategy_prompt = strategy_prompt_template.format(input_query=query)
+    formatted_strategy_prompt = strategy_prompt_template.format(input_query=query, chat_history_summary=chat_history_summary)
     
     reasoning_steps.append(f"Asking LLM to decide search strategy for query: '{query}'. Prompt: {formatted_strategy_prompt[:200]}...")
 
@@ -177,7 +209,7 @@ def search_cheese_node(state: AgentState, resources: Dict[str, Any]) -> AgentSta
         try:
             # keyword_search_mongo is expected to return a list of dicts
             # It uses an LLM (llm_for_mongo_keywords) to generate the actual mongo query.
-            mongo_matches = keyword_search_mongo(mongo_collection, query, llm_for_mongo_keywords, limit=10)
+            mongo_matches = keyword_search_mongo(mongo_collection, query, llm_for_mongo_keywords, limit=10, chat_history_summary=chat_history_summary)
             reasoning_steps.append(f"MongoDB keyword search returned {len(mongo_matches)} matches.")
             for item in mongo_matches:
                 if '_id' in item:
@@ -231,6 +263,21 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
     input_query = state["input_query"]
     executed_search_strategy = state.get("executed_search_strategy", "unknown")
     
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+            else:
+                # Handle dictionary format if present
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
     print("Debuging agent.py line 231: Executed search strategy: ", executed_search_strategy)
 
     reasoning_steps = state.get("reasoning_steps", [])
@@ -250,7 +297,8 @@ def evaluate_search_node(state: AgentState, resources: Dict[str, Any]) -> AgentS
     formatted_prompt = prompt_template.format(
         input_query=input_query,
         search_results_details_json=search_results_details_json, # Use new placeholder and pass JSON string
-        executed_search_strategy=executed_search_strategy
+        executed_search_strategy=executed_search_strategy,
+        chat_history_summary=chat_history_summary
     )
     
     messages = [HumanMessage(content=formatted_prompt)]
@@ -397,15 +445,22 @@ def generate_composite_response_node(state: AgentState, resources: Dict[str, Any
     reasoning_steps = state.get("reasoning_steps", [])
     reasoning_steps.append(f"Generating composite response for query: '{input_query}'. Strategy used: {executed_search_strategy}")
 
-    # chat_history_for_prompt_summary is no longer used by this node's prompt.
-    # chat_history_for_prompt_summary = "\n".join([
-    #     f"{msg['role'] if isinstance(msg, dict) else (msg[0] if isinstance(msg, tuple) else msg.type)}: {msg['content'] if isinstance(msg, dict) else (msg[1] if isinstance(msg, tuple) else msg.content)}"
-    #     for msg in chat_history[-5:] # Last 5 messages for summary
-    # ])
-    # if not chat_history_for_prompt_summary:
-    #     chat_history_for_prompt_summary = "No recent chat history."
+    chat_history = state.get('chat_history', [])
+    chat_history_summary = ""
+    if chat_history:
+        # Convert the last 5 messages to a readable format
+        recent_messages = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        formatted_messages = []
+        for msg in recent_messages:
+            if isinstance(msg, tuple):
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+            else:
+                # Handle dictionary format if present
+                formatted_messages.append(f"{msg.type}: {msg.content}")
+        chat_history_summary = "\n".join(formatted_messages)
+    else:
+        chat_history_summary = "No previous conversation history."
 
-    # Step 1: Prepare search_results_summary_for_llm by serializing all search results to JSON
     search_results_summary_for_llm = "No relevant cheeses found in the search."
 
     if search_results:
@@ -427,6 +482,7 @@ def generate_composite_response_node(state: AgentState, resources: Dict[str, Any
     formatted_system_prompt = prompt_template.format(
         input_query=input_query,
         # chat_history_summary=chat_history_for_prompt_summary, # Removed
+        chat_history_summary=chat_history_summary,
         search_results_summary=search_results_summary_for_llm,
         executed_search_strategy=executed_search_strategy,
         count=count if count > 0 else "undefined", # Ensure count is properly handled if 0, prompt expects a string or number not literally "undefined"

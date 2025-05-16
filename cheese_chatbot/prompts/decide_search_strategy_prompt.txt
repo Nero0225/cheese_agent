@@ -13,7 +13,10 @@ Based on the user's query, you need to determine if it's better suited for:
     *   "What's similar to Brie but a bit firmer?"
     *   "Looking for something nutty and aged."
 
-Consider the latest user query:
+Recent chat history (for context):
+{chat_history_summary}
+
+Consider the user query:
 "{input_query}"
 
 Return a JSON object with a single key "search_strategy" and the value as either "mongodb" or "pinecone".

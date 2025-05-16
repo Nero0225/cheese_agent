@@ -24,6 +24,9 @@ The cheese documents have the following relevant fields:
 - relateds (list of strings): A list of SKUs for related cheese products.
 - href (string): A URL link to the product page.
 
+Recent chat history (for context):
+{chat_history_summary}
+
 User Query: "{query}"
 
 **Output Format:**

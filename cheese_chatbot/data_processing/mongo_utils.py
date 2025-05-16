@@ -149,7 +149,7 @@ def ensure_text_indexes(collection):
     else:
         print(f"Text index '{index_name}' (or equivalent) already exists.")
 
-def keyword_search_mongo(collection, user_query: str, llm_instance: any, limit: int = 10) -> list:
+def keyword_search_mongo(collection, user_query: str, llm_instance: any, limit: int = 10, chat_history_summary: str = "") -> list:
     """
     Performs a search in MongoDB using an LLM-generated query (filter or aggregation).
     Tries to infer if an aggregation query is needed, otherwise generates a filter query.
@@ -179,7 +179,7 @@ def keyword_search_mongo(collection, user_query: str, llm_instance: any, limit: 
 
     try:
         prompt_template = load_prompt_from_file("mongo_unified_query_generation_prompt.txt")
-        llm_prompt = prompt_template.format(query=user_query)
+        llm_prompt = prompt_template.format(query=user_query, chat_history_summary=chat_history_summary)
         
         response = llm_instance.invoke([HumanMessage(content=llm_prompt)])
         # print(response.content)
