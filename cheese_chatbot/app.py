@@ -177,7 +177,7 @@ if prompt := st.chat_input("What cheese are you looking for? Or type 'quit' to e
                     print("="*100)
                     
                     # Handle interrupts for human feedback
-                    if current_state_output.get("human_feedback_needed") and current_state_output.get("current_node") == "request_human_input":
+                    if current_state_output.get("human_feedback_needed"):
                         st.session_state.graph_config = current_state_output
                         clarification_q = current_state_output.get(
                             "clarification_question",
@@ -185,8 +185,9 @@ if prompt := st.chat_input("What cheese are you looking for? Or type 'quit' to e
                         )
                         full_response = extract_content_from_message(clarification_q)
                     # Update response if available
-                    if current_state_output.get("llm_response"):
-                        full_response = extract_content_from_message(current_state_output["llm_response"])
+                    else:
+                        if current_state_output.get("llm_response"):
+                            full_response = extract_content_from_message(current_state_output["llm_response"])
 
                 except Exception as e:
                     logger.error(f"Error processing graph output: {e}")

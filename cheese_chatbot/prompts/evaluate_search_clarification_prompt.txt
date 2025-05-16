@@ -39,5 +39,3 @@ Response Format:
   "clarification_needed": false,  // Default to false unless absolutely necessary
   "clarification_question": ""    // Only fill if clarification_needed is true
 }}
-
-Remember: If the search results contain ANY relevant data that could help answer the query, even partially, DO NOT ask for clarification. Let the response generation handle the data processing.
