@@ -1,0 +1,14 @@
+# env
+/venv
+/cheese_chatbot/.env
+
+# __pycache__
+/cheese_chatbot/agent/__pycache__
+/cheese_chatbot/data_processing/__pycache__
+/cheese_chatbot/prompts/__pycache__
+/cheese_chatbot/static/__pycache__
+
+# other
+graph.txt
+/temp
+test.py
