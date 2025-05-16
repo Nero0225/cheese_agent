@@ -177,33 +177,33 @@ if prompt := st.chat_input("What cheese are you looking for? Or type 'quit' to e
                     print("="*100)
                     
                     # Handle interrupts for human feedback
-                    if current_state_output.get("human_feedback_needed"):
+                    if current_state_output.get("human_feedback_needed") and current_state_output.get("current_node") == "request_human_input":
                         st.session_state.graph_config = current_state_output
                         clarification_q = current_state_output.get(
                             "clarification_question",
                             "I need more information. Could you please clarify?"
                         )
                         full_response = extract_content_from_message(clarification_q)
-                        response_placeholder.markdown(full_response + " (waiting for your feedback...)")
-
                     # Update response if available
-                    if current_state_output.get("llm_response") and current_state_output.get("current_node") == "generate_composite_response":
+                    if current_state_output.get("llm_response"):
                         full_response = extract_content_from_message(current_state_output["llm_response"])
-                        response_placeholder.markdown(full_response)
 
                 except Exception as e:
                     logger.error(f"Error processing graph output: {e}")
                     continue
-
-            # Handle completion
-            if not current_state_output.get("human_feedback_needed"):
+            
+            if full_response:
                 st.session_state.graph_config = None
-                if not full_response:
-                    if current_state_output and current_state_output.get("llm_response"):
-                        full_response = current_state_output.get("llm_response")
-                    else:
-                        full_response = "I've processed your request. Let me know if you need anything else!"
-                    response_placeholder.markdown(full_response)
+                response_placeholder.markdown(full_response)
+            # Handle completion
+            # if current_state_output:
+            #     st.session_state.graph_config = None
+            #     if not full_response:
+            #         if current_state_output and current_state_output.get("llm_response"):
+            #             full_response = current_state_output.get("llm_response")
+            #         else:
+            #             full_response = "I've processed your request. Let me know if you need anything else!"
+            #         response_placeholder.markdown(full_response)
 
         except Exception as e:
             error_msg = f"An error occurred while processing your request: {e}"

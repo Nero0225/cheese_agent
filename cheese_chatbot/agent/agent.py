@@ -319,14 +319,14 @@ def request_human_input_node(state: AgentState, resources: Dict[str, Any]) -> Ag
     
     reasoning_steps.append(f"Agent is requesting human input. Question posed to user: \"{clarification_to_ask}\"")
     
-    # new_state = {
-    #     **state, 
-    #     "current_node": "request_human_input", 
-    #     "status_message": f"Waiting for your response to: {clarification_to_ask}",
-    #     "reasoning_steps": reasoning_steps
-    # }
+    new_state = {
+        **state, 
+        "current_node": "request_human_input", 
+        "status_message": f"Waiting for your response to: {clarification_to_ask}",
+        "reasoning_steps": reasoning_steps
+    }
     
-    human_response = interrupt({"state": state})
+    human_response = interrupt({"state": new_state})
     human_response = human_response.get("human_response", "")
     print("Debuging agent.py line 331: Human response: ", human_response)
     # This node itself doesn't return human_input; it signals the graph to wait.
