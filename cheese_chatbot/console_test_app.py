@@ -100,7 +100,7 @@ def run_console_chat():
             
             try:
                 if event_output['__interrupt__']:
-                    current_state_output_for_loop = event_output['__interrupt__'].value['state']
+                    current_state_output_for_loop = event_output['__interrupt__'][0].value['state']
                 print("Debugging console_test_app.py line 102: current_state_output_for_loop: ", current_state_output_for_loop.get("current_node"))
             except:
                 current_state_output_for_loop = event_output

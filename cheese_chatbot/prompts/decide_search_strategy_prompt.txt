@@ -18,6 +18,10 @@ Consider the latest user query:
 
 Return a JSON object with a single key "search_strategy" and the value as either "mongodb" or "pinecone".
 
+Important Guideline
+- For price-related queries, prefer MongoDB search
+- For descriptive or similarity-based queries, prefer vector search
+
 Example for a query best for MongoDB:
 User Query: "How many Schreiber brand cheeses do you have?"
 {{

@@ -1,37 +1,43 @@
 You are an AI assistant evaluating search results for a cheese chatbot.
-Your task is to determine if the user's query requires clarification before attempting to generate a response based on the search results provided.
+Your task is to determine if the user's query TRULY requires clarification before generating a response, or if the search results are sufficient to provide a meaningful answer.
 
 User's current query: "{input_query}"
 Search strategy used: {executed_search_strategy}
-Search Results (JSON format, potentially long):
+Search Results (JSON format):
 {search_results_details_json}
 
-**When to AVOID asking for clarification:**
+IMPORTANT: If the search results contain enough information to answer the query, even if processing or analysis is needed, DO NOT ask for clarification.
 
-1.  **Direct Questions about Data:** If the query asks for factual data that can be derived from the search results (even if it requires counting, sorting, or filtering), do NOT ask for clarification. Examples:
-    *   "What is the cheapest cheese?"
-    *   "How many different kinds of cheese product do you have in total?"
-    *   "Please show me all cheese that is cheaper than $50 per each."
-    *   "Can you show me all goat cheese?"
-    *   "How much Sliced Cheese do you have? show me all"
-    *   "Please give me most expensive 10 cheese products by price"
-    *   "How many brands of cheese do you have?"
-    *   "plz show me all products that are expensive than $50."
-    *   "How many categories of cheese?"
-    For these, assume the next step will try to process the `search_results_details_json` to answer.
+**Questions that NEVER need clarification (if search results exist):**
 
-2.  **Broad Recommendation Requests with Clear Intent:** If the query asks for recommendations but is relatively clear (e.g., "What kind of cheese is good for athletes?"), and search results are available, do NOT ask for clarification immediately. The response generation step will attempt to use the results.
+1. **Quantitative/Analytical Questions:**
+   - Counting/aggregation (e.g., "How many brands do you have?")
+   - Price-based queries (e.g., "Show me cheese under $50")
+   - Brand/category analysis (e.g., "How many products does each brand have?")
+   - Statistical queries (e.g., "What's the average price of mozzarella?")
+   - Listing/filtering requests (e.g., "Show me all goat cheese products")
 
-3.  **Sufficient Search Results:** If `search_results_details_json` contains relevant items (even if many), it's generally better to proceed to response generation rather than asking the user to narrow down, unless the original query was extremely vague and the results are clearly unhelpful for that vague query.
+2. **Comparative Questions:**
+   - Price comparisons (e.g., "What's the most expensive cheese?")
+   - Brand comparisons (e.g., "Which brand has the most products?")
+   - Category analysis (e.g., "Which category has the fewest items?")
 
-**When to CONSIDER asking for clarification:**
+3. **Specific Data Queries:**
+   - Brand-specific queries (e.g., "List all Galbani products")
+   - Category-specific queries (e.g., "Show me all sliced cheese")
+   - Product counts by criteria (e.g., "How many brands have less than 10 products?")
+   - Price range queries (e.g., "List cheeses between $20 and $50")
 
-1.  **Truly Ambiguous/Vague Queries:** If the `input_query` is very unclear (e.g., "Tell me about cheese stuff") AND the `search_results_details_json` are sparse or seem unrelated due to the vagueness, clarification might be needed.
-2.  **Contradictory or Impossible Requests (that search couldn't resolve):** If the query has inherent contradictions that the search results don't resolve (e.g., "I want a hard soft cheese").
+**ONLY ask for clarification when:**
+1. The query is completely vague with no specific criteria (e.g., "I want cheese")
+2. The query contains contradictory requirements
+3. The query uses undefined or ambiguous terms not present in the data
+4. The search results are completely empty AND the query is not specific enough to modify the search
 
-**Your Output:**
-Respond with a JSON object: {{"clarification_needed": bool, "clarification_question": "If needed, what specific question should be asked?"}}
+Response Format:
+{{
+  "clarification_needed": false,  // Default to false unless absolutely necessary
+  "clarification_question": ""    // Only fill if clarification_needed is true
+}}
 
--   Set `clarification_needed` to `false` for the types of direct questions listed above, or if results seem sufficient for a reasonable query.
--   Only set `clarification_needed` to `true` if the query is genuinely too ambiguous to proceed with the current search results and none of the "AVOID" conditions apply.
--   If `clarification_needed` is `true`, the `clarification_question` should be very specific to resolve the ambiguity.
+Remember: If the search results contain ANY relevant data that could help answer the query, even partially, DO NOT ask for clarification. Let the response generation handle the data processing.

@@ -4,6 +4,7 @@ import json
 from typing import List, Dict, Any, TypedDict, Optional, Tuple
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END, START
 from dotenv import load_dotenv
 
@@ -318,30 +319,32 @@ def request_human_input_node(state: AgentState, resources: Dict[str, Any]) -> Ag
     
     reasoning_steps.append(f"Agent is requesting human input. Question posed to user: \"{clarification_to_ask}\"")
     
-    new_state = {
-        **state, 
-        "current_node": "request_human_input", 
-        "status_message": f"Waiting for your response to: {clarification_to_ask}",
-        "reasoning_steps": reasoning_steps
-    }
+    # new_state = {
+    #     **state, 
+    #     "current_node": "request_human_input", 
+    #     "status_message": f"Waiting for your response to: {clarification_to_ask}",
+    #     "reasoning_steps": reasoning_steps
+    # }
     
-    human_response = interrupt({"state": new_state})
+    human_response = interrupt({"state": state})
     human_response = human_response.get("human_response", "")
+    print("Debuging agent.py line 331: Human response: ", human_response)
     # This node itself doesn't return human_input; it signals the graph to wait.
     # The human input would then be injected into the state by an external mechanism
     # before the graph transitions to the next node (e.g., process_human_input_node).
     return {
         **state, 
         "human_response": human_response,
-        # "current_node": "request_human_input", 
+        "current_node": "request_human_input", 
         # "status_message": f"Waiting for your response to: {clarification_to_ask}",
-        # "reasoning_steps": reasoning_steps
+        "reasoning_steps": reasoning_steps
     }
 
 
 def process_human_input_node(state: AgentState, resources: Dict[str, Any]) -> AgentState:
     """Processes the human's response to a clarification request."""
     human_response = state.get("human_response", "")
+    input_query = state.get("input_query", "")
     print(f"--- Processing Human Input: {human_response} ---")
     
     chat_history = state.get("chat_history", [])
@@ -354,11 +357,11 @@ def process_human_input_node(state: AgentState, resources: Dict[str, Any]) -> Ag
         # Avoid adding if it's empty or None.
         # Check if the last assistant message was already this question to avoid duplicates if re-entering.
         if not chat_history or not (chat_history[-1].content == assistant_question_asked and chat_history[-1].type == "assistant_clarification"):
-             chat_history.append(("assistant_clarification", assistant_question_asked))
+             chat_history.append(("ai", assistant_question_asked))
     
     # Ensure human_response is not empty before adding
     if human_response and human_response.strip():
-        chat_history.append(("user_clarification_response", human_response))
+        chat_history.append(("user", human_response))
 
     reasoning_steps = state.get("reasoning_steps", [])
     reasoning_steps.append(f"Human provided response: '{human_response}'. This will be treated as the new query, and original query was: '{original_query_for_clarification}'.")
@@ -367,7 +370,7 @@ def process_human_input_node(state: AgentState, resources: Dict[str, Any]) -> Ag
     # Store the original query that led to this, in case it's needed for context later (though chat history also has it)
     return {
         **state,
-        "input_query": human_response, 
+        "input_query": input_query + " " + human_response, 
         "original_query_for_clarification": original_query_for_clarification, # Persist original query if needed
         "chat_history": chat_history,
         "search_results": [],
@@ -567,5 +570,7 @@ def get_graph(resources: Dict[str, Any]):
     graph_builder.add_edge("generate_greeting_response", END)
     graph_builder.add_edge("handle_unrelated_query", END) # New edge to END
 
-    compiled_graph = graph_builder.compile()
+    memory = MemorySaver()
+
+    compiled_graph = graph_builder.compile(checkpointer=memory)
     return compiled_graph
