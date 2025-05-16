@@ -45,7 +45,7 @@ def get_mongo_client():
         try:
             _mongo_client_instance = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
             # The ismaster command is cheap and does not require auth.
-            # _mongo_client_instance.admin.command('ismaster')
+            _mongo_client_instance.admin.command('ismaster')
             print("Successfully connected to MongoDB.")
         except ConnectionFailure as e:
             print(f"MongoDB connection failed: {e}")
