@@ -3,7 +3,7 @@ langchain-openai
 langgraph
 streamlit
 pymongo
-pinecone-client
+pinecone
 fastapi
 uvicorn
 requests
