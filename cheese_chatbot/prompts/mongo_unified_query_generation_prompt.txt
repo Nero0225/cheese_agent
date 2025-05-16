@@ -17,6 +17,7 @@ The cheese documents have the following relevant fields:
 - empty (boolean): A flag indicating if the item is considered empty or out of stock. but this value is independent of price.
 - warning_text (string): Allergen or other warnings.
 - showImage (string): URL to the primary display image for the cheese.
+- images (list of strings): A list of URLs to images of the cheese.
 - itemCounts (object): Describes available packaging units and their counts. Keys are unit types (e.g., "EACH", "CASE") and values are descriptive strings (e.g., "1 Item", "4 Eaches").
 - dimensions (object): Describes the dimensions for different packaging units. Keys are unit types (e.g., "EACH", "CASE") and values are descriptive strings (e.g., "L 1\\" x W 1\\" x H 1\\"").
 - weights (object): Describes the weights for different packaging units. Keys are unit types (e.g., "EACH", "CASE") and values are descriptive strings (e.g., "20 lbs", "5.15 lbs").
@@ -36,7 +37,7 @@ Return a single JSON object with two keys:
 
 **If generating a FILTER query:**
 - Use appropriate MongoDB query operators (e.g., $eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $regex, $text, $and, $or, $not, $nor, $exists).
-- For text searches, prefer `$regex` with `options: 'i'` for case-insensitivity on relevant fields. text search use only name + category + brand. if the text contain space, the search each words and merge.
+- For text searches, prefer `$regex` with `options: 'i'` for case-insensitivity on relevant fields. text search use only name + category + brand. if the text contain space, the search each words and merge. but if the search text is same as name or category or brand, Don't use `$regex`.
 
 **If generating an AGGREGATION query:**
 - Use appropriate pipeline stages (e.g., $match, $group, $sort, $project, $limit, $count, $addFields).
