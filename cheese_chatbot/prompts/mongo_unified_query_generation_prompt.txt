@@ -13,7 +13,7 @@ The cheese documents have the following relevant fields:
 - pricePer (string): The price per unit (e.g., "$2.70/lb"). This may require parsing for numerical comparisons or aggregations.
 - prices (object): Contains price information. Keys can vary (e.g., "Each", "Case") and values are string representations of prices (e.g., 53.98). Example: `prices.Each`.
 - price (number): The price of the cheese.
-- priceOrder (number): An ordering metric related to price.
+- priceOrder (number): An ordering metric related to price. This order is from the most expensive to cheapest.
 - popularityOrder (number): An ordering metric related to popularity.
 - discount (string): Discount information, may be an empty string.
 - empty (boolean): A flag indicating if the item is considered empty or out of stock. but this value is independent of price.

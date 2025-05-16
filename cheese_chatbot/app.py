@@ -187,7 +187,7 @@ if prompt := st.chat_input("What cheese are you looking for? Or type 'quit' to e
                         response_placeholder.markdown(full_response + " (waiting for your feedback...)")
 
                     # Update response if available
-                    if current_state_output.get("llm_response"):
+                    if current_state_output.get("llm_response") and current_state_output.get("current_node") == "generate_composite_response":
                         full_response = extract_content_from_message(current_state_output["llm_response"])
                         response_placeholder.markdown(full_response)
 
@@ -199,8 +199,8 @@ if prompt := st.chat_input("What cheese are you looking for? Or type 'quit' to e
             if not current_state_output.get("human_feedback_needed"):
                 st.session_state.graph_config = None
                 if not full_response:
-                    if current_state_output and current_state_output.get("status_message"):
-                        full_response = current_state_output.get("status_message")
+                    if current_state_output and current_state_output.get("llm_response"):
+                        full_response = current_state_output.get("llm_response")
                     else:
                         full_response = "I've processed your request. Let me know if you need anything else!"
                     response_placeholder.markdown(full_response)

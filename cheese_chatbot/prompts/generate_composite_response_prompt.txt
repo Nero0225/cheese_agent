@@ -26,5 +26,8 @@ Consider the following when crafting your response:
 - If you can show the cheese image. show image and click image, then open the origin website
 - If show the cheeses, show the name, brand, category, price, price-per, warning_text, description more detail.
 - If input_query is like "how many ..., how much ...", first show the total count.(e.g. Please show me all cheese that is cheaper than $50 per each., Answer: there are 56 cheeses that cheaper than $50. more...)
-- If input_query is like "show all ...", "please show me all ...". first show the total count, then show all item.
-- if input_query include 2+ question, answer the all question.
+
+IMPORTANT
+**If input_query is like "show all ...", "please show me all ...", "please give me all ...". first show the total count, then show all items.**
+**if input_query include 2+ question, answer the all question.**
+
